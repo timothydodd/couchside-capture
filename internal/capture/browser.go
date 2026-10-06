@@ -1,10 +1,12 @@
 package capture
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"image/jpeg"
 	"log/slog"
 	"strings"
 	"sync"
@@ -87,6 +89,9 @@ func (b *Browser) Open(ctx context.Context) error {
 	if err == nil {
 		err = b.fitViewport(tab)
 	}
+	if err == nil {
+		err = b.fitFrames(tab)
+	}
 	if err != nil {
 		all()
 		return fmt.Errorf("open %s: %w", b.cfg.URL, err)
@@ -144,6 +149,74 @@ func (b *Browser) fitViewport(tab context.Context) error {
 		slog.Info("viewport corrected", "was", fmt.Sprintf("%dx%d", w, h), "now", fmt.Sprintf("%dx%d", w2, h2))
 	}
 	return nil
+}
+
+// fitFrames checks the size of the frames the screencast actually delivers.
+// Some builds hand over only the part of the page inside the window's own
+// bounds, which --window-size didn't make tall enough, so the frame is
+// shorter than the viewport. The window is grown by the difference until a
+// frame is the picture size.
+func (b *Browser) fitFrames(tab context.Context) error {
+	for attempt := 0; attempt < 3; attempt++ {
+		w, h, err := b.sampleFrame(tab)
+		if err != nil {
+			slog.Warn("couldn't check the frame size", "err", err)
+			return nil
+		}
+		if w == b.cfg.Width && h == b.cfg.Height {
+			if attempt > 0 {
+				slog.Info("frames now the picture size", "size", fmt.Sprintf("%dx%d", w, h))
+			}
+			return nil
+		}
+		slog.Info("frames aren't the picture size; growing the window", "frame", fmt.Sprintf("%dx%d", w, h),
+			"wanted", fmt.Sprintf("%dx%d", b.cfg.Width, b.cfg.Height))
+		err = chromedp.Run(tab, chromedp.ActionFunc(func(ctx context.Context) error {
+			id, bounds, err := browser.GetWindowForTarget().Do(ctx)
+			if err != nil {
+				return err
+			}
+			return browser.SetWindowBounds(id, &browser.Bounds{
+				Width:  bounds.Width + int64(b.cfg.Width-w),
+				Height: bounds.Height + int64(b.cfg.Height-h),
+			}).Do(ctx)
+		}))
+		if err != nil {
+			return fmt.Errorf("resize window: %w", err)
+		}
+		// The window grew, so the viewport may have too: pin it back.
+		if err := chromedp.Run(tab, emulation.SetDeviceMetricsOverride(int64(b.cfg.Width), int64(b.cfg.Height), 1, false)); err != nil {
+			return err
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	slog.Warn("frames stay off the picture size; they'll be letterboxed")
+	return nil
+}
+
+// sampleFrame runs the screencast just long enough to get one frame and
+// reports its size.
+func (b *Browser) sampleFrame(tab context.Context) (w, h int, err error) {
+	b.latest.Store(nil)
+	if err := chromedp.Run(tab, page.StartScreencast().WithFormat(page.ScreencastFormatJpeg).WithQuality(50).
+		WithMaxWidth(int64(b.cfg.Width)).WithMaxHeight(int64(b.cfg.Height)).WithEveryNthFrame(1)); err != nil {
+		return 0, 0, err
+	}
+	defer func() { _ = chromedp.Run(tab, page.StopScreencast()) }()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if f := b.latest.Load(); f != nil {
+			cfg, err := jpeg.DecodeConfig(bytes.NewReader(*f))
+			if err != nil {
+				return 0, 0, err
+			}
+			return cfg.Width, cfg.Height, nil
+		}
+		// A still page paints nothing: nudge it.
+		_ = chromedp.Run(tab, chromedp.Evaluate(`window.dispatchEvent(new Event('resize'))`, nil))
+		time.Sleep(100 * time.Millisecond)
+	}
+	return 0, 0, errors.New("no frame arrived")
 }
 
 // waitCtx lets a load that chromedp.Run finished early still respect ctx.
