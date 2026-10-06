@@ -111,7 +111,11 @@ func encoderArgs(cfg Config, dir string) ([]string, error) {
 	kbps := strconv.Itoa(cfg.BitrateK)
 	args = append(args,
 		"-map", "0:v:0", "-map", "1:a:0", "-shortest", // closing the frames ends it; the audio never would
-		"-vf", fmt.Sprintf("scale=%d:%d:flags=bicubic,format=yuv420p", cfg.Width&^1, cfg.Height&^1),
+		// Fit the frame in the picture without distorting it (black bars if the
+		// shape is off), and say the pixels are square: scale alone would keep
+		// the frame's shape by flagging stretched pixels instead.
+		"-vf", fmt.Sprintf("scale=%d:%d:flags=bicubic:force_original_aspect_ratio=decrease,pad=%d:%d:-1:-1,setsar=1,format=yuv420p",
+			cfg.Width&^1, cfg.Height&^1, cfg.Width&^1, cfg.Height&^1),
 		"-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-profile:v", "main",
 		"-g", gop, "-keyint_min", gop, "-sc_threshold", "0", "-r", fps,
 		"-b:v", kbps+"k", "-maxrate", kbps+"k", "-bufsize", strconv.Itoa(cfg.BitrateK*2)+"k",

@@ -40,7 +40,7 @@ func TestEncoderArgs(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := strings.Join(args, " ")
-	for _, want := range []string{"-f image2pipe -framerate 10 -c:v mjpeg -i pipe:0", "anullsrc", "scale=640:480", "-g 20", "-hls_time 2", filepath.Join(dir, "stream.m3u8")} {
+	for _, want := range []string{"-f image2pipe -framerate 10 -c:v mjpeg -i pipe:0", "anullsrc", "scale=640:480:flags=bicubic:force_original_aspect_ratio=decrease,pad=640:480:-1:-1,setsar=1", "-g 20", "-hls_time 2", filepath.Join(dir, "stream.m3u8")} {
 		if !strings.Contains(s, want) {
 			t.Errorf("args lack %q:\n%s", want, s)
 		}

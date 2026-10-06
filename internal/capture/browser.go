@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
@@ -83,12 +84,65 @@ func (b *Browser) Open(ctx context.Context) error {
 	if err == nil {
 		err = waitCtx(loadCtx, tab)
 	}
+	if err == nil {
+		err = b.fitViewport(tab)
+	}
 	if err != nil {
 		all()
 		return fmt.Errorf("open %s: %w", b.cfg.URL, err)
 	}
 	b.cancel, b.tab, b.frozen = all, tab, false
 	slog.Info("page open", "url", b.cfg.URL, "size", fmt.Sprintf("%dx%d", b.cfg.Width, b.cfg.Height))
+	return nil
+}
+
+// fitViewport makes the page's viewport exactly the picture size. Some
+// Chromium builds (Alpine's, in headless mode) count window decoration in
+// --window-size, leaving the page shorter than asked, and the screencast
+// then hands over frames of the wrong shape.
+func (b *Browser) fitViewport(tab context.Context) error {
+	measure := func() (w, h int, err error) {
+		var dims []int
+		if err := chromedp.Run(tab, chromedp.Evaluate(`[window.innerWidth, window.innerHeight]`, &dims)); err != nil {
+			return 0, 0, err
+		}
+		if len(dims) != 2 {
+			return 0, 0, errors.New("couldn't measure the viewport")
+		}
+		return dims[0], dims[1], nil
+	}
+	w, h, err := measure()
+	if err != nil {
+		return err
+	}
+	if w == b.cfg.Width && h == b.cfg.Height {
+		return nil
+	}
+	// Grow (or shrink) the window by the difference, then look again.
+	err = chromedp.Run(tab, chromedp.ActionFunc(func(ctx context.Context) error {
+		id, bounds, err := browser.GetWindowForTarget().Do(ctx)
+		if err != nil {
+			return err
+		}
+		return browser.SetWindowBounds(id, &browser.Bounds{
+			Width:  bounds.Width + int64(b.cfg.Width-w),
+			Height: bounds.Height + int64(b.cfg.Height-h),
+		}).Do(ctx)
+	}))
+	if err != nil {
+		return fmt.Errorf("resize window: %w", err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	w2, h2, err := measure()
+	if err != nil {
+		return err
+	}
+	if w2 != b.cfg.Width || h2 != b.cfg.Height {
+		slog.Warn("the viewport isn't the picture size; frames will be letterboxed", "viewport", fmt.Sprintf("%dx%d", w2, h2),
+			"wanted", fmt.Sprintf("%dx%d", b.cfg.Width, b.cfg.Height))
+	} else {
+		slog.Info("viewport corrected", "was", fmt.Sprintf("%dx%d", w, h), "now", fmt.Sprintf("%dx%d", w2, h2))
+	}
 	return nil
 }
 
