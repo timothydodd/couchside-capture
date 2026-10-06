@@ -338,7 +338,7 @@ func (b *Browser) StartCapture() error {
 	b.frames.Store(0)
 	b.latest.Store(nil)
 	return chromedp.Run(b.tab, page.StartScreencast().
-		WithFormat(page.ScreencastFormatJpeg).WithQuality(85).
+		WithFormat(page.ScreencastFormatJpeg).WithQuality(int64(b.cfg.Quality)).
 		WithMaxWidth(int64(b.cfg.Width)).WithMaxHeight(int64(b.cfg.Height)).WithEveryNthFrame(1))
 }
 

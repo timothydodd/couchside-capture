@@ -77,6 +77,9 @@ spec:
       labels:
         app: capture
     spec:
+      # For GPU encoding: the host groups that own /dev/dri (ls -ln /dev/dri).
+      # securityContext:
+      #   supplementalGroups: [991, 44]
       containers:
         - name: capture
           image: ghcr.io/timothydodd/couchside-capture:latest
@@ -100,6 +103,12 @@ spec:
             #   value: /music
             - name: TZ
               value: America/New_York
+            # GPU encoding (Intel/AMD): also uncomment the securityContext,
+            # supplementalGroups and the dev-dri mount and volume below.
+            # - name: CAPTURE_HWACCEL
+            #   value: vaapi
+          # securityContext:
+          #   privileged: true # containerd's device allowlist blocks /dev/dri otherwise
           readinessProbe:
             httpGet:
               path: /health
@@ -117,6 +126,8 @@ spec:
             # Chromium needs more shared memory than a container's default 64 MB.
             - name: shm
               mountPath: /dev/shm
+            # - name: dev-dri
+            #   mountPath: /dev/dri
             # - name: music
             #   mountPath: /music
             #   readOnly: true
@@ -125,6 +136,10 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 256Mi
+        # - name: dev-dri
+        #   hostPath:
+        #     path: /dev/dri
+        #     type: Directory
 ---
 apiVersion: v1
 kind: Service

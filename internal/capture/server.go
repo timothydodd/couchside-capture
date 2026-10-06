@@ -254,5 +254,9 @@ func (c Config) Describe() string {
 	if c.Music != "" {
 		music = "music from " + c.Music
 	}
-	return strings.Join([]string{c.URL, mode, music}, "; ")
+	enc := "x264 " + c.Preset
+	if c.HWAccel == "vaapi" {
+		enc = "VAAPI on " + c.VAAPI
+	}
+	return strings.Join([]string{c.URL, mode, music, enc}, "; ")
 }

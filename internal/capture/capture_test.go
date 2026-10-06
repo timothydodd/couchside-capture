@@ -25,7 +25,7 @@ func TestConfigFromEnv(t *testing.T) {
 	t.Setenv("CAPTURE_MODE", "cold")
 	t.Setenv("CAPTURE_IDLE", "90s")
 	c, err := FromEnv()
-	if err != nil || c.Warm || c.Idle != 90*time.Second || c.FPS != 10 || c.Width != 640 {
+	if err != nil || c.Warm || c.Idle != 90*time.Second || c.FPS != 10 || c.Width != 640 || c.Preset != "superfast" || c.Quality != 75 || c.HWAccel != "" {
 		t.Fatalf("config = %+v, %v", c, err)
 	}
 }
@@ -34,7 +34,7 @@ func TestConfigFromEnv(t *testing.T) {
 // otherwise, HLS out.
 func TestEncoderArgs(t *testing.T) {
 	dir := t.TempDir()
-	cfg := Config{FPS: 10, Width: 641, Height: 480, BitrateK: 1500}
+	cfg := Config{FPS: 10, Width: 641, Height: 480, BitrateK: 1500, Preset: "superfast"}
 	args, err := encoderArgs(cfg, dir)
 	if err != nil {
 		t.Fatal(err)
@@ -44,6 +44,13 @@ func TestEncoderArgs(t *testing.T) {
 		if !strings.Contains(s, want) {
 			t.Errorf("args lack %q:\n%s", want, s)
 		}
+	}
+	if !strings.Contains(s, "-c:v libx264 -preset superfast") {
+		t.Errorf("software args lack the preset:\n%s", s)
+	}
+	hw, _ := encoderArgs(Config{FPS: 10, Width: 640, Height: 480, BitrateK: 1500, HWAccel: "vaapi", VAAPI: "/dev/dri/renderD128"}, dir)
+	if hs := strings.Join(hw, " "); !strings.Contains(hs, "-vaapi_device /dev/dri/renderD128 -analyzeduration") || !strings.Contains(hs, "hwupload -c:v h264_vaapi") {
+		t.Errorf("vaapi args:\n%s", hs)
 	}
 	music := t.TempDir()
 	if _, err := encoderArgs(Config{FPS: 10, Width: 640, Height: 480, BitrateK: 1500, Music: music}, dir); err == nil {

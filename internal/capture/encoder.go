@@ -109,14 +109,24 @@ func encoderArgs(cfg Config, dir string) ([]string, error) {
 	}
 	gop := strconv.Itoa(cfg.FPS * segDur)
 	kbps := strconv.Itoa(cfg.BitrateK)
+	// Fit the frame in the picture without distorting it (black bars if the
+	// shape is off), and say the pixels are square: scale alone would keep
+	// the frame's shape by flagging stretched pixels instead.
+	vf := fmt.Sprintf("scale=%d:%d:flags=bicubic:force_original_aspect_ratio=decrease,pad=%d:%d:-1:-1,setsar=1",
+		cfg.Width&^1, cfg.Height&^1, cfg.Width&^1, cfg.Height&^1)
+	var video []string
+	if cfg.HWAccel == "vaapi" {
+		args = append([]string{args[0], args[1], args[2], args[3], "-vaapi_device", cfg.VAAPI}, args[4:]...)
+		vf += ",format=nv12,hwupload"
+		video = []string{"-c:v", "h264_vaapi", "-profile:v", "main", "-bf", "0"}
+	} else {
+		vf += ",format=yuv420p"
+		video = []string{"-c:v", "libx264", "-preset", cfg.Preset, "-tune", "zerolatency", "-profile:v", "main"}
+	}
+	args = append(args, "-map", "0:v:0", "-map", "1:a:0", "-shortest") // closing the frames ends it; the audio never would
+	args = append(args, "-vf", vf)
+	args = append(args, video...)
 	args = append(args,
-		"-map", "0:v:0", "-map", "1:a:0", "-shortest", // closing the frames ends it; the audio never would
-		// Fit the frame in the picture without distorting it (black bars if the
-		// shape is off), and say the pixels are square: scale alone would keep
-		// the frame's shape by flagging stretched pixels instead.
-		"-vf", fmt.Sprintf("scale=%d:%d:flags=bicubic:force_original_aspect_ratio=decrease,pad=%d:%d:-1:-1,setsar=1,format=yuv420p",
-			cfg.Width&^1, cfg.Height&^1, cfg.Width&^1, cfg.Height&^1),
-		"-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-profile:v", "main",
 		"-g", gop, "-keyint_min", gop, "-sc_threshold", "0", "-r", fps,
 		"-b:v", kbps+"k", "-maxrate", kbps+"k", "-bufsize", strconv.Itoa(cfg.BitrateK*2)+"k",
 		"-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
@@ -124,6 +134,23 @@ func encoderArgs(cfg Config, dir string) ([]string, error) {
 		"-hls_flags", "delete_segments+independent_segments+temp_file",
 		"-hls_segment_filename", filepath.Join(dir, "seg%d.ts"), filepath.Join(dir, playlistNm))
 	return args, nil
+}
+
+// TestHWAccel checks that the GPU encoder works (driver present, device
+// reachable) with a one-frame encode, so a misconfigured GPU falls back to
+// software at start rather than failing every stream.
+func TestHWAccel(cfg Config) error {
+	if cfg.HWAccel != "vaapi" {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, cfg.FFmpeg, "-hide_banner", "-nostdin", "-loglevel", "error", "-vaapi_device", cfg.VAAPI,
+		"-f", "lavfi", "-i", "color=black:s=64x64:r=10:d=0.2", "-vf", "format=nv12,hwupload", "-c:v", "h264_vaapi", "-f", "null", "-").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %s", err, lastLine(string(out)))
+	}
+	return nil
 }
 
 // musicList writes a concat list of the folder's audio files, shuffled.

@@ -24,6 +24,10 @@ func main() {
 		slog.Error(err.Error())
 		os.Exit(2)
 	}
+	if err := capture.TestHWAccel(cfg); err != nil {
+		slog.Warn("the GPU encoder doesn't work here; encoding in software", "err", err)
+		cfg.HWAccel = ""
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 

@@ -11,6 +11,7 @@ FROM alpine:3.21
 # Chromium draws the page, ffmpeg encodes it. The fonts are for pages that
 # don't bring their own.
 RUN apk add --no-cache chromium ffmpeg font-noto font-noto-emoji ca-certificates tzdata \
+ && if [ "$(apk --print-arch)" = "x86_64" ]; then apk add --no-cache intel-media-driver libva-intel-driver mesa-va-gallium; fi \
  && adduser -D -H -u 1000 capture \
  && mkdir -p /tmp/couchside-capture && chown capture:capture /tmp/couchside-capture
 COPY LICENSE /usr/share/licenses/couchside-capture/

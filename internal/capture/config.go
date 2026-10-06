@@ -18,6 +18,10 @@ type Config struct {
 	Height   int           //
 	FPS      int           // frames per second captured and encoded
 	BitrateK int           // video bitrate, kbit/s
+	Preset   string        // x264 preset: ultrafast … veryfast; lighter is less CPU for a bigger picture
+	Quality  int           // JPEG quality of the frames Chromium hands over (1-100): lower is less work for it
+	HWAccel  string        // "vaapi" encodes on an Intel/AMD GPU through /dev/dri; "" is software
+	VAAPI    string        // the render node for vaapi
 	Music    string        // folder of MP3/AAC/Ogg files looped under the picture; "" for silence
 	Idle     time.Duration // stop encoding this long after the last request
 	Warm     bool          // keep the page loaded (frozen) between viewers; false launches the browser on demand
@@ -33,6 +37,8 @@ func FromEnv() (Config, error) {
 		URL: os.Getenv("CAPTURE_URL"), Addr: envOr("CAPTURE_ADDR", ":9800"),
 		Width: envInt("CAPTURE_WIDTH", 640), Height: envInt("CAPTURE_HEIGHT", 480), FPS: envInt("CAPTURE_FPS", 10),
 		BitrateK: envInt("CAPTURE_BITRATE_K", 1500), Music: os.Getenv("CAPTURE_MUSIC"),
+		Preset: envOr("CAPTURE_PRESET", "superfast"), Quality: envInt("CAPTURE_QUALITY", 75),
+		HWAccel: envOr("CAPTURE_HWACCEL", ""), VAAPI: envOr("CAPTURE_VAAPI_DEVICE", "/dev/dri/renderD128"),
 		Idle: envDur("CAPTURE_IDLE", time.Minute), Warm: envOr("CAPTURE_MODE", "warm") != "cold",
 		Reload: envDur("CAPTURE_RELOAD_AFTER", 10*time.Minute), Chrome: os.Getenv("CAPTURE_CHROME"),
 		FFmpeg: envOr("CAPTURE_FFMPEG", "ffmpeg"), Dir: envOr("CAPTURE_DIR", os.TempDir()+"/couchside-capture"),
@@ -46,6 +52,20 @@ func FromEnv() (Config, error) {
 	}
 	if c.FPS < 1 || c.FPS > 30 {
 		return c, fmt.Errorf("CAPTURE_FPS must be 1 to 30")
+	}
+	switch c.Preset {
+	case "ultrafast", "superfast", "veryfast", "faster", "fast", "medium":
+	default:
+		return c, fmt.Errorf("CAPTURE_PRESET is an x264 preset: ultrafast, superfast, veryfast, faster, fast or medium")
+	}
+	if c.Quality < 1 || c.Quality > 100 {
+		return c, fmt.Errorf("CAPTURE_QUALITY is 1 to 100")
+	}
+	if c.HWAccel != "" && c.HWAccel != "vaapi" && c.HWAccel != "none" {
+		return c, fmt.Errorf("CAPTURE_HWACCEL is vaapi or empty")
+	}
+	if c.HWAccel == "none" {
+		c.HWAccel = ""
 	}
 	if m := envOr("CAPTURE_MODE", "warm"); m != "warm" && m != "cold" {
 		return c, fmt.Errorf("CAPTURE_MODE is warm or cold")

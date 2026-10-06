@@ -39,6 +39,10 @@ plus this.
 | `CAPTURE_WIDTH` / `CAPTURE_HEIGHT` | `640` / `480` | Picture size |
 | `CAPTURE_FPS` | `10` | Frames per second (1 to 30) |
 | `CAPTURE_BITRATE_K` | `1500` | Video bitrate, kbit/s |
+| `CAPTURE_PRESET` | `superfast` | x264 preset (`ultrafast` to `medium`): lighter is less CPU for a bigger picture |
+| `CAPTURE_QUALITY` | `75` | JPEG quality of the frames Chromium hands over (1-100): lower is less work for it |
+| `CAPTURE_HWACCEL` | none | `vaapi` encodes on an Intel or AMD GPU through `/dev/dri` (needs the device in the container); falls back to software if the test encode fails |
+| `CAPTURE_VAAPI_DEVICE` | `/dev/dri/renderD128` | The render node for `vaapi` |
 | `CAPTURE_MUSIC` | none | Folder of audio files (MP3, M4A, Ogg, FLAC, WAV) looped under the picture, shuffled |
 | `CAPTURE_IDLE` | `1m` | Stop encoding this long after the last request |
 | `CAPTURE_MODE` | `warm` | `warm` keeps the page loaded and frozen; `cold` launches Chromium per viewer |
@@ -58,6 +62,16 @@ plus this.
   Its name, look and data are its own; this project only captures the page.
 - Chromium runs with `--no-sandbox`, as containers without user namespaces
   need. Point it only at pages you trust.
+
+## CPU
+
+While someone is watching, a 640×480 forecast costs about a third of one core
+on an Intel N100: half of it ffmpeg, a third Chromium drawing the page, and
+nothing at all while idle. To trim it: `CAPTURE_PRESET=ultrafast` and a lower
+`CAPTURE_QUALITY` shave a little; `CAPTURE_FPS=5` halves most of it if the
+page has nothing that moves smoothly; `CAPTURE_HWACCEL=vaapi` moves the H.264
+encode to the GPU, which needs `/dev/dri` mounted and, on k3s, a privileged
+container with the device's groups (see `deploy/k3s/weatherstar.yaml`).
 
 ## Build
 
