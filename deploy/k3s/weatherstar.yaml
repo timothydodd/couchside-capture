@@ -1,0 +1,140 @@
+# A 1990s-style local forecast as a Couchside stream channel: ws4kp (the
+# WeatherStar 4000+ recreation, github.com/netbymatt/ws4kp) drawn by
+# couchside-capture. Nothing encodes until someone tunes in.
+#
+# Set the location in CAPTURE_URL, apply, then in Couchside add a channel with
+# "A stream address":
+#
+#   http://capture.weatherstar.svc.cluster.local:9800/stream.m3u8
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: weatherstar
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ws4kp
+  namespace: weatherstar
+  labels:
+    app: ws4kp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ws4kp
+  template:
+    metadata:
+      labels:
+        app: ws4kp
+    spec:
+      containers:
+        - name: ws4kp
+          image: ghcr.io/netbymatt/ws4kp:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ws4kp
+  namespace: weatherstar
+spec:
+  selector:
+    app: ws4kp
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capture
+  namespace: weatherstar
+  labels:
+    app: capture
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: capture
+  template:
+    metadata:
+      labels:
+        app: capture
+    spec:
+      containers:
+        - name: capture
+          image: ghcr.io/timothydodd/couchside-capture:latest
+          ports:
+            - name: http
+              containerPort: 9800
+          env:
+            # The page, with ws4kp's settings in the address: kiosk mode (no
+            # menus), the location, and which screens to leave out.
+            - name: CAPTURE_URL
+              value: "http://ws4kp:8080/?kiosk=true&latLonQuery=Orlando%20International%20Airport%20Orlando%20FL%20USA&hazards=false"
+            - name: CAPTURE_WIDTH
+              value: "640"
+            - name: CAPTURE_HEIGHT
+              value: "480"
+            - name: CAPTURE_FPS
+              value: "10"
+            # A folder of your own music, looped under the picture. Leave it
+            # out for silence.
+            # - name: CAPTURE_MUSIC
+            #   value: /music
+            - name: TZ
+              value: America/New_York
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+          # Idle: Chromium loaded but stopped (memory only). Watching: one
+          # Chromium and one ffmpeg at 640x480.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          volumeMounts:
+            # Chromium needs more shared memory than a container's default 64 MB.
+            - name: shm
+              mountPath: /dev/shm
+            # - name: music
+            #   mountPath: /music
+            #   readOnly: true
+      volumes:
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: capture
+  namespace: weatherstar
+spec:
+  selector:
+    app: capture
+  ports:
+    - name: http
+      port: 9800
+      targetPort: http
