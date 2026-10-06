@@ -55,6 +55,12 @@ func (b *Browser) Open(ctx context.Context) error {
 		chromedp.Flag("autoplay-policy", "no-user-gesture-required"),
 		chromedp.Flag("disable-background-timer-throttling", true),
 		chromedp.Flag("disable-renderer-backgrounding", true),
+		// No crash reporting: in a container there's nowhere for it to go, and
+		// Alpine's Chromium refuses to start when its handler has no database.
+		chromedp.Flag("disable-crash-reporter", true),
+		chromedp.Flag("disable-crashpad", true),
+		chromedp.Flag("no-first-run", true),
+		chromedp.Flag("disable-dev-shm-usage", false), // /dev/shm is mounted large enough
 	)
 	if b.cfg.Chrome != "" {
 		opts = append(opts, chromedp.ExecPath(b.cfg.Chrome))

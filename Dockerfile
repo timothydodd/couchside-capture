@@ -18,7 +18,10 @@ COPY --from=build /out/capture /usr/local/bin/capture
 
 ENV CAPTURE_ADDR=:9800 \
     CAPTURE_CHROME=/usr/bin/chromium-browser \
-    CAPTURE_DIR=/tmp/couchside-capture
+    CAPTURE_DIR=/tmp/couchside-capture \
+    HOME=/tmp/couchside-capture \
+    XDG_CONFIG_HOME=/tmp/couchside-capture \
+    XDG_CACHE_HOME=/tmp/couchside-capture
 
 USER 1000:1000
 EXPOSE 9800
