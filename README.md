@@ -82,3 +82,9 @@ CAPTURE_URL=https://example.com CAPTURE_CHROME=/usr/bin/google-chrome ./capture
 
 Tests: `go test ./...`. The release workflow publishes a multi-arch image on a
 `v*` tag.
+
+## License
+
+MIT. The programs and Go modules it is built from keep their own licenses:
+see THIRD_PARTY_NOTICES.txt (also in the image, under
+/usr/share/licenses/couchside-capture).
