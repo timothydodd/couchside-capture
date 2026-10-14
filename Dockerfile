@@ -15,10 +15,11 @@ RUN apk add --no-cache chromium ffmpeg font-noto font-noto-emoji ca-certificates
  && adduser -D -H -u 1000 capture \
  && mkdir -p /tmp/couchside-capture && chown capture:capture /tmp/couchside-capture
 COPY LICENSE THIRD_PARTY_NOTICES.txt /usr/share/licenses/couchside-capture/
-# The exact ffmpeg build in this image, so the GPL source offer in
-# THIRD_PARTY_NOTICES.txt can be checked.
+# The exact ffmpeg build and every package version in this image, so the
+# sources named in THIRD_PARTY_NOTICES.txt can be matched to what ships.
 RUN ffmpeg -hide_banner -version > /usr/share/licenses/couchside-capture/ffmpeg-configuration.txt \
- && apk info -v ffmpeg >> /usr/share/licenses/couchside-capture/ffmpeg-configuration.txt
+ && apk info -v ffmpeg >> /usr/share/licenses/couchside-capture/ffmpeg-configuration.txt \
+ && apk info -v | sort > /usr/share/licenses/couchside-capture/packages.txt
 COPY --from=build /out/capture /usr/local/bin/capture
 
 ENV CAPTURE_ADDR=:9800 \

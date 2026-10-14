@@ -56,10 +56,22 @@ plus this.
 
 ## Notes
 
+- **Capture only what you may restream.** couchside-capture records whatever
+  the page shows. Make sure you have the right to capture and rebroadcast it:
+  check the site's terms and the copyright in its text, pictures and sound, and
+  keep the stream on your own network unless you're sure. It is meant for pages
+  like dashboards, weather and clocks, not for paid or DRM-protected video
+  services, and it does nothing to get around access controls.
 - **Linux only.** Freezing uses SIGSTOP on Chromium's processes.
-- **Music is yours to supply.** Nothing is bundled.
-- **ws4kp** uses US National Weather Service data, so the forecast is US only.
-  Its name, look and data are its own; this project only captures the page.
+- **Music is yours to supply.** Nothing is bundled, and you need the rights to
+  any music you loop under the picture.
+- **ws4kp** is a separate open-source project by its own authors and uses US
+  National Weather Service data, so the forecast is US only. Its name, look
+  and data are its own; this project only captures the page.
+- **Trademarks.** WeatherStar and The Weather Channel are trademarks of their
+  owners. couchside-capture is not affiliated with, endorsed by or sponsored
+  by The Weather Channel, The Weather Company or the ws4kp authors; ws4kp is
+  an independent fan recreation.
 - Chromium runs with `--no-sandbox`, as containers without user namespaces
   need. Point it only at pages you trust.
 

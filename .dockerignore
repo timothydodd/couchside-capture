@@ -1,4 +1,5 @@
 .git
+.tmp
 capture
 deploy
 *.md

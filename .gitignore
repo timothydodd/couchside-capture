@@ -1,3 +1,4 @@
 /capture
 /dist/
+/.tmp/
 *.log
