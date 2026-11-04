@@ -7,7 +7,7 @@ COPY . .
 ARG TARGETOS TARGETARCH VERSION=dev
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o /out/capture ./cmd/capture
 
-FROM alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
+FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 # Chromium draws the page, ffmpeg encodes it. The fonts are for pages that
 # don't bring their own.
 RUN apk add --no-cache chromium ffmpeg font-noto font-noto-emoji ca-certificates tzdata \
